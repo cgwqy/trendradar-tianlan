@@ -10,6 +10,8 @@
 from pathlib import Path
 from typing import Dict, List, Optional, Callable
 
+from trendradar.report.helpers import convert_google_news_url
+
 
 def prepare_report_data(
     stats: List[Dict],
@@ -73,6 +75,8 @@ def prepare_report_data(
             for title, title_data in titles_data.items():
                 url = title_data.get("url", "")
                 mobile_url = title_data.get("mobileUrl", "")
+                url = convert_google_news_url(url, title)
+                mobile_url = convert_google_news_url(mobile_url, title)
                 ranks = title_data.get("ranks", [])
 
                 processed_title = {
@@ -112,8 +116,8 @@ def prepare_report_data(
                 "count": title_data["count"],
                 "ranks": title_data["ranks"],
                 "rank_threshold": title_data["rank_threshold"],
-                "url": title_data.get("url", ""),
-                "mobile_url": title_data.get("mobileUrl", ""),
+                "url": convert_google_news_url(title_data.get("url", ""), title_data["title"]),
+                "mobile_url": convert_google_news_url(title_data.get("mobileUrl", ""), title_data["title"]),
                 "is_new": title_data.get("is_new", False),
                 "rank_timeline": title_data.get("rank_timeline", []),
             }
