@@ -59,7 +59,12 @@ def format_title_for_platform(
 
     if platform == "feishu":
         if link_url:
-            formatted_title = f"[{cleaned_title}]({link_url})"
+            # 飞书卡片 2.0 的 markdown 链接（[标题](超长链接)）会丢失标题文字、只显示 URL，
+            # 改为标题与链接分行展示，保证标题始终可见（URL 会被飞书自动识别为可点击链接）
+            if cleaned_title:
+                formatted_title = f"{cleaned_title}\n{link_url}"
+            else:
+                formatted_title = link_url
         else:
             formatted_title = cleaned_title
 
