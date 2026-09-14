@@ -100,6 +100,17 @@ class RSSFetcher:
 
             parsed_items = self.parser.parse(response.text, feed.url)
 
+            # DEBUG: 打印 Google 源原始条目字段
+            if "news.google.com" in feed.url:
+                import feedparser as _fp
+                _feed = _fp.parse(response.text)
+                for _e in _feed.entries[:2]:
+                    print(f"[DEBUG] title={_e.get('title','')[:50]!r}")
+                    print(f"[DEBUG] link={_e.get('link','')[:80]!r}")
+                    print(f"[DEBUG] summary={str(_e.get('summary',''))[:400]!r}")
+                    print(f"[DEBUG] description={str(_e.get('description',''))[:400]!r}")
+                    print(f"[DEBUG] keys={list(_e.keys())[:20]}")
+
             # 限制条目数量（0=不限制）
             if feed.max_items > 0:
                 parsed_items = parsed_items[:feed.max_items]
