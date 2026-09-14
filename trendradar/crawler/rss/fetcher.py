@@ -100,47 +100,35 @@ class RSSFetcher:
 
             parsed_items = self.parser.parse(response.text, feed.url)
 
-            # DEBUG: 测试多个新闻源方案
+            # DEBUG: 测试新浪/凤凰/百度搜索页
             if "news.google.com" in feed.url:
                 import requests as _req, re as _re
-                _ua = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36"}
-                # 1. Google URL 变体
-                _variants = [
-                    ("google-atom", "https://news.google.com/rss/search?q=%E9%80%A0%E7%BA%B8&output=atom"),
-                    ("google-glUS", "https://news.google.com/rss/search?q=%E9%80%A0%E7%BA%B8&hl=zh-CN&gl=US&ceid=US:zh-Hans"),
-                    ("google-noparam", "https://news.google.com/rss/search?q=%E9%80%A0%E7%BA%B8"),
-                ]
-                for _name, _u in _variants:
+                _ua = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36",
+                       "Accept-Language": "zh-CN,zh;q=0.9"}
+                # 1. 新浪搜索
+                for _name, _u in [
+                    ("sina", "https://search.sina.com.cn/?q=%E9%80%A0%E7%BA%B8&c=news"),
+                    ("ifeng", "https://so.ifeng.com/?q=%E9%80%A0%E7%BA%B8"),
+                ]:
                     try:
-                        _r = _req.get(_u, timeout=20, headers=_ua)
-                        _links = _re.findall(r"<link>([^<]+)</link>", _r.text)[:3]
-                        print(f"[DEBUG] {_name}: HTTP {_r.status_code} 链接: {[l[:60] for l in _links]}")
+                        _r = _req.get(_u, timeout=25, headers=_ua)
+                        _all = _re.findall(r'<a[^>]+href="(https?://[^"]+)"[^>]*>([^<]{10,60})</a>', _r.text)
+                        _ok = [(h,t) for h,t in _all if 'sina.com.cn' not in h and 'ifeng.com' not in h and 'javascript' not in h and 'so.com' not in h][:5]
+                        print(f"[DEBUG] {_name}: HTTP {_r.status_code} 长度={len(_r.text)} 外链数={len(_ok)}")
+                        for h,t in _ok[:5]:
+                            print(f"[DEBUG]   {t[:28]!r} -> {h[:80]}")
                     except Exception as _e:
                         print(f"[DEBUG] {_name}: 错误 {_e}")
-                # 2. jina.ai 代理
-                try:
-                    _r = _req.get("https://r.jina.ai/https://news.google.com/rss/search?q=%E9%80%A0%E7%BA%B8", timeout=30, headers=_ua)
-                    print(f"[DEBUG] jina: HTTP {_r.status_code} 前200字: {_r.text[:200]!r}")
-                except Exception as _e:
-                    print(f"[DEBUG] jina: 错误 {_e}")
-                # 3. 百度资讯搜索
+                # 2. 百度资讯诊断
                 try:
                     _r = _req.get("https://www.baidu.com/s?tn=news&word=%E9%80%A0%E7%BA%B8", timeout=20, headers=_ua)
-                    _m = _re.findall(r'<a[^>]+href="(http://www\.baidu\.com/link\?url=[^"]+)"[^>]*>(.*?)</a>', _r.text)[:3]
-                    print(f"[DEBUG] 百度资讯: HTTP {_r.status_code} 链接数={len(_re.findall(r'baidu\.com/link', _r.text))}")
-                    for _h, _t in _m:
-                        print(f"[DEBUG]   标题:{_t[:30]!r} 链接:{_h[:80]}")
+                    _l = _re.findall(r'href="([^"]+)"', _r.text)
+                    _l = [x for x in _l if 'baidu' in x or 'http' in x][:8]
+                    print(f"[DEBUG] 百度: HTTP {_r.status_code} href样例: {_l}")
+                    _t = _re.sub(r'<[^>]+>', ' ', _r.text)
+                    print(f"[DEBUG] 百度 文本片段: {_t[500:800]!r}")
                 except Exception as _e:
-                    print(f"[DEBUG] 百度资讯: 错误 {_e}")
-                # 4. 中国纸网
-                try:
-                    _r = _req.get("http://www.chinapaper.net/news/", timeout=20, headers=_ua)
-                    print(f"[DEBUG] 中国纸网: HTTP {_r.status_code} 长度={len(_r.text)}")
-                    _m = _re.findall(r'<a[^>]+href="([^"]*\.html[^"]*)"[^>]*>([^<]{8,40})</a>', _r.text)[:5]
-                    for _h, _t in _m:
-                        print(f"[DEBUG]   标题:{_t[:30]!r} 链接:{_h[:70]}")
-                except Exception as _e:
-                    print(f"[DEBUG] 中国纸网: 错误 {_e}")
+                    print(f"[DEBUG] 百度: 错误 {_e}")
 
             # 限制条目数量（0=不限制）
             if feed.max_items > 0:
