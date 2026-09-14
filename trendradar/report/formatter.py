@@ -54,6 +54,14 @@ def format_title_for_platform(
     if not cleaned_title:
         cleaned_title = link_url or title_data["url"] or ""
 
+    # Google News 加密链接国内网络无法访问，替换为百度搜索"标题"链接（国内可打开）
+    if link_url and "news.google.com" in link_url and cleaned_title and cleaned_title != link_url:
+        try:
+            import urllib.parse
+            link_url = "https://www.baidu.com/s?wd=" + urllib.parse.quote(cleaned_title)
+        except Exception:
+            pass
+
     # 获取关键词标签（platform 模式使用）
     keyword = title_data.get("matched_keyword", "") if show_keyword else ""
 
