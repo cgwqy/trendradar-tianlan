@@ -100,35 +100,36 @@ class RSSFetcher:
 
             parsed_items = self.parser.parse(response.text, feed.url)
 
-            # DEBUG: 测试新浪/凤凰/百度搜索页
+            # DEBUG: 测试东方财富搜索API + RSSHub备选实例
             if "news.google.com" in feed.url:
-                import requests as _req, re as _re
+                import requests as _req, re as _re, json as _json
                 _ua = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36",
-                       "Accept-Language": "zh-CN,zh;q=0.9"}
-                # 1. 新浪搜索
-                for _name, _u in [
-                    ("sina", "https://search.sina.com.cn/?q=%E9%80%A0%E7%BA%B8&c=news"),
-                    ("ifeng", "https://so.ifeng.com/?q=%E9%80%A0%E7%BA%B8"),
-                ]:
+                       "Referer": "https://so.eastmoney.com/"}
+                # 1. 东方财富搜索API
+                for _kw in ["造纸", "木浆", "厄尔尼诺"]:
                     try:
-                        _r = _req.get(_u, timeout=25, headers=_ua)
-                        _all = _re.findall(r'<a[^>]+href="(https?://[^"]+)"[^>]*>([^<]{10,60})</a>', _r.text)
-                        _ok = [(h,t) for h,t in _all if 'sina.com.cn' not in h and 'ifeng.com' not in h and 'javascript' not in h and 'so.com' not in h][:5]
-                        print(f"[DEBUG] {_name}: HTTP {_r.status_code} 长度={len(_r.text)} 外链数={len(_ok)}")
-                        for h,t in _ok[:5]:
-                            print(f"[DEBUG]   {t[:28]!r} -> {h[:80]}")
+                        _param = _json.dumps({"uid":"","keyword":_kw,"type":["cmsArticleWebOld"],"client":"web","clientType":"web","clientVersion":"curr","param":{"cmsArticleWebOld":{"searchScope":"default","sort":"time","pageIndex":1,"pageSize":8,"preTag":"","postTag":""}}}, ensure_ascii=False)
+                        import urllib.parse as _up
+                        _u = "https://search-api-web.eastmoney.com/search/jsonp?cb=jQuery&param=" + _up.quote(_param)
+                        _r = _req.get(_u, timeout=20, headers=_ua)
+                        _t = _r.text
+                        # 解析 JSONP
+                        _m = _re.search(r'jQuery\((.*)\)\s*$', _t, _re.S)
+                        _data = _json.loads(_m.group(1)) if _m else {}
+                        _arts = (_data.get("result") or {}).get("cmsArticleWebOld") or []
+                        print(f"[DEBUG] 东财[{_kw}]: HTTP {_r.status_code} 文章数={len(_arts)}")
+                        for _a in _arts[:4]:
+                            print(f"[DEBUG]   {(_a.get('title') or '')[:30]!r} -> {(_a.get('url') or '')[:70]}  {(_a.get('date') or '')[:16]}")
                     except Exception as _e:
-                        print(f"[DEBUG] {_name}: 错误 {_e}")
-                # 2. 百度资讯诊断
-                try:
-                    _r = _req.get("https://www.baidu.com/s?tn=news&word=%E9%80%A0%E7%BA%B8", timeout=20, headers=_ua)
-                    _l = _re.findall(r'href="([^"]+)"', _r.text)
-                    _l = [x for x in _l if 'baidu' in x or 'http' in x][:8]
-                    print(f"[DEBUG] 百度: HTTP {_r.status_code} href样例: {_l}")
-                    _t = _re.sub(r'<[^>]+>', ' ', _r.text)
-                    print(f"[DEBUG] 百度 文本片段: {_t[500:800]!r}")
-                except Exception as _e:
-                    print(f"[DEBUG] 百度: 错误 {_e}")
+                        print(f"[DEBUG] 东财[{_kw}]: 错误 {_e}")
+                # 2. RSSHub 其他实例
+                for _inst in ["https://rsshub.rssforever.com", "https://rsshub.ktachibana.party", "https://rsshub.pseudoyu.com"]:
+                    try:
+                        _r = _req.get(_inst + "/google/news/%E9%80%A0%E7%BA%B8", timeout=15, headers=_ua)
+                        _l = _re.findall(r"<link>(https?://[^<]+)</link>", _r.text)[:3]
+                        print(f"[DEBUG] RSSHub[{_inst}]: HTTP {_r.status_code} 链接: {[x[:50] for x in _l]}")
+                    except Exception as _e:
+                        print(f"[DEBUG] RSSHub[{_inst}]: 错误 {str(_e)[:60]}")
 
             # 限制条目数量（0=不限制）
             if feed.max_items > 0:
