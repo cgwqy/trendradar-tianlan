@@ -243,6 +243,13 @@ class RSSParser:
         if not title:
             return None
 
+        # Google News RSS 链接是加密跳转链接（国内无法访问），从 description 的 <a href> 提取原始新闻链接
+        if url and "news.google.com" in url:
+            raw_desc = entry.get("summary") or entry.get("description") or ""
+            m = re.search(r'<a[^>]+href=["\'](https?://[^"\']+)["\']', raw_desc)
+            if m and "news.google.com" not in m.group(1):
+                url = m.group(1)
+
         published_at = self._parse_date(entry)
         summary = self._parse_summary(entry)
         author = self._parse_author(entry)
