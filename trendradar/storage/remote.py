@@ -639,6 +639,27 @@ class RemoteStorageBackend(SQLiteStorageMixin, StorageBackend):
             print(f"[远程存储] 保存 HTML 报告失败: {e}")
             return None
 
+    def upload_html_report(self, local_path: str, key: str) -> bool:
+        """上传 HTML 报告到远程存储（Content-Type: text/html，浏览器可直接打开）"""
+        try:
+            from pathlib import Path
+            p = Path(local_path)
+            if not p.exists():
+                print(f"[远程存储] HTML 报告不存在: {local_path}")
+                return False
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=p.read_bytes(),
+                ContentType="text/html; charset=utf-8",
+                ContentDisposition="inline",
+            )
+            print(f"[远程存储] HTML 报告已上传: {key}")
+            return True
+        except Exception as e:
+            print(f"[远程存储] 上传 HTML 报告失败: {e}")
+            return False
+
     # ========================================
     # 远程特有功能：资源清理
     # ========================================
