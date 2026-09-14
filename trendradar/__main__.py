@@ -787,6 +787,20 @@ class NewsAnalyzer:
                 translate_report_func=translate_report_func,
             )
 
+        # 上传 HTML 报告到远程存储（可选，配置了 S3 即生效）
+        if html_file:
+            try:
+                storage = getattr(self, "storage_manager", None)
+                if storage is not None and hasattr(storage, "upload_html_report"):
+                    p = Path(html_file)
+                    date_folder = self.ctx.format_date()
+                    storage.upload_html_report(str(p), f"html/{date_folder}/{p.name}")
+                    latest_html = Path("output") / "html" / "latest" / f"{self.report_mode}.html"
+                    if latest_html.exists():
+                        storage.upload_html_report(str(latest_html), f"html/latest/{self.report_mode}.html")
+            except Exception as e:
+                print(f"[HTML] 上传 HTML 报告失败: {e}")
+
         return stats, html_file, ai_result, rss_items, standalone_data, rss_new_items
 
     def _send_notification_if_needed(
