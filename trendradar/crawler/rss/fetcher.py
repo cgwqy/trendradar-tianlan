@@ -100,39 +100,22 @@ class RSSFetcher:
 
             parsed_items = self.parser.parse(response.text, feed.url)
 
-            # DEBUG: 综合解码测试
+            # DEBUG: 测试 RSSHub Google News 路由
             if "news.google.com" in feed.url:
-                import base64 as _b64, re as _re, zlib as _zlib, gzip as _gzip
-                def _td(u):
-                    m = _re.search(r'/articles/([^?]+)', u)
-                    if not m: return "NOART"
-                    b64 = m.group(1)
+                import requests as _req, re as _re
+                for _q in ["造纸", "木浆", "厄尔尼诺"]:
                     try:
-                        d1 = _b64.urlsafe_b64decode(b64 + '=' * (-len(b64) % 4))
-                    except Exception: return "B64ERR"
-                    m2 = _re.search(rb'[A-Za-z0-9_-]{20,}', d1)
-                    if not m2: return "NOINNER:" + repr(d1[:60])
-                    inner = m2.group(0)
-                    try:
-                        d2 = _b64.urlsafe_b64decode(inner + b'=' * (-len(inner) % 4))
-                    except Exception: return "INNERERR"
-                    out = []
-                    for name, fn in [("zlib", lambda b: _zlib.decompress(b)), ("rawdeflate", lambda b: _zlib.decompress(b, -15)), ("gzip", lambda b: _gzip.decompress(b))]:
-                        try:
-                            o = fn(d2)
-                            out.append(f"{name}OK:{o[:150]!r}")
-                        except Exception: pass
-                    txt = d2.decode('utf-8', errors='ignore')
-                    if 'http' in txt.lower():
-                        out.append(f"PLAINURL:{_re.findall(r'https?://[^\s"<>]+', txt)[:3]}")
-                    if not out:
-                        out.append(f"RAW({len(d2)}B):{d2[:120]!r}")
-                    return " | ".join(out)
-                import feedparser as _fp
-                _feed = _fp.parse(response.text)
-                for _e in _feed.entries[:2]:
-                    print(f"[DEBUG] link={_e.get('link','')[:80]!r}")
-                    print(f"[DEBUG] decode={_td(_e.get('link',''))}")
+                        _r = _req.get("https://rsshub.app/google/news/" + _q, timeout=25, headers={"User-Agent": "Mozilla/5.0"})
+                        print(f"[DEBUG] RSSHub {_q}: HTTP {_r.status_code}, 长度={len(_r.text)}")
+                        if _r.status_code == 200:
+                            _links = _re.findall(r"<link>(https?://[^<]+)</link>", _r.text)[:5]
+                            for _l in _links:
+                                print(f"[DEBUG]   {_l[:100]}")
+                            _desc = _re.findall(r"<description><![CDATA\[.{0,200}", _r.text)
+                            if _desc:
+                                print(f"[DEBUG]   desc: {_desc[0][:150]}")
+                    except Exception as _e:
+                        print(f"[DEBUG] RSSHub {_q}: 错误 {_e}")
 
             # 限制条目数量（0=不限制）
             if feed.max_items > 0:
