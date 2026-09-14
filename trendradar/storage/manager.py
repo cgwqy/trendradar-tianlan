@@ -238,6 +238,13 @@ class StorageManager:
         """保存 HTML 报告"""
         return self.get_backend().save_html_report(html_content, filename)
 
+    def upload_html_report(self, local_path: str, key: str) -> bool:
+        """上传 HTML 报告到远程存储（浏览器可直接打开）"""
+        backend = self.get_backend()
+        if backend is not None and hasattr(backend, "upload_html_report"):
+            return backend.upload_html_report(local_path, key)
+        return False
+
     def is_first_crawl_today(self, date: Optional[str] = None) -> bool:
         """检查是否是当天第一次抓取"""
         return self.get_backend().is_first_crawl_today(date)
