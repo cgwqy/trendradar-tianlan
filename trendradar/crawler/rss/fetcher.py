@@ -100,29 +100,32 @@ class RSSFetcher:
 
             parsed_items = self.parser.parse(response.text, feed.url)
 
-            # DEBUG: 东财API原始响应诊断
+            # DEBUG: 东财列表栏目测试+关键词过滤
             if "news.google.com" in feed.url:
-                import requests as _req
+                import requests as _req, json as _json
                 _ua = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36",
-                       "Referer": "https://so.eastmoney.com/"}
-                # 1. 搜索API原始响应
+                       "Referer": "https://finance.eastmoney.com/"}
+                _kws = ["纸", "木浆", "厄尔尼诺", "浆"]
+                for _col, _name in [(350, "宏观"), (353, "产业"), (351, "财经"), (354, "公司")]:
+                    try:
+                        _u = f"https://np-listapi.eastmoney.com/comm/web/getNewsByColumns?client=web&biz=web_news_col&column={_col}&order=1&needInteractData=0&page_index=1&page_size=30&req_trace=1"
+                        _r = _req.get(_u, timeout=20, headers=_ua)
+                        _d = _r.json()
+                        _list = (_d.get("data") or {}).get("list") or []
+                        _hit = [x for x in _list if any(k in (x.get("summary") or "") for k in _kws)]
+                        print(f"[DEBUG] 东财[{_name}/col={_col}]: 共{len(_list)}条 命中关键词={len(_hit)}")
+                        for _x in _hit[:5]:
+                            print(f"[DEBUG]   {(_x.get('summary') or '')[:38]!r}")
+                            print(f"[DEBUG]     -> {(_x.get('uniqueUrl') or '')[:75]}  {(_x.get('showTime') or '')[:16]}")
+                    except Exception as _e:
+                        print(f"[DEBUG] 东财[{_name}/col={_col}]: 错误 {str(_e)[:60]}")
+                # 对照组：Google 列表当前是否正常
                 try:
-                    _param = '{"uid":"","keyword":"%E9%80%A0%E7%BA%B8","type":["cmsArticleWebOld"],"client":"web","clientType":"web","clientVersion":"curr","param":{"cmsArticleWebOld":{"searchScope":"default","sort":"time","pageIndex":1,"pageSize":8,"preTag":"","postTag":""}}}'
-                    import urllib.parse as _up
-                    _u = "https://search-api-web.eastmoney.com/search/jsonp?cb=jQuery&param=" + _up.quote(_param)
-                    _r = _req.get(_u, timeout=20, headers=_ua)
-                    print(f"[DEBUG] 东财搜索: HTTP {_r.status_code}")
-                    print(f"[DEBUG]   原始响应前500: {_r.text[:500]!r}")
+                    _u = "https://news.google.com/rss/search?q=%E9%80%A0%E7%BA%B8"
+                    _r = _req.get(_u, timeout=15, headers=_ua)
+                    print(f"[DEBUG] Google对照: HTTP {_r.status_code} 长度={len(_r.text)}")
                 except Exception as _e:
-                    print(f"[DEBUG] 东财搜索: 错误 {_e}")
-                # 2. 东财资讯列表API
-                try:
-                    _u2 = "https://np-listapi.eastmoney.com/comm/web/getNewsByColumns?client=web&biz=web_news_col&column=350&order=1&needInteractData=0&page_index=1&page_size=10&req_trace=1"
-                    _r2 = _req.get(_u2, timeout=20, headers=_ua)
-                    print(f"[DEBUG] 东财列表: HTTP {_r2.status_code}")
-                    print(f"[DEBUG]   原始响应前500: {_r2.text[:500]!r}")
-                except Exception as _e:
-                    print(f"[DEBUG] 东财列表: 错误 {_e}")
+                    print(f"[DEBUG] Google对照: 错误 {str(_e)[:60]}")
 
             # 限制条目数量（0=不限制）
             if feed.max_items > 0:
