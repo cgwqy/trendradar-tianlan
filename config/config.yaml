@@ -148,6 +148,9 @@ rss:
     - id: "google-mujiang"
       name: "木浆新闻(Google)"
       url: "https://news.google.com/rss/search?q=%E6%9C%A8%E6%B5%86&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+    - id: "google-enino"
+      name: "厄尔尼诺新闻(Google)"
+      url: "https://news.google.com/rss/search?q=%E5%8E%84%E5%B0%94%E5%B0%BC%E8%AF%BA&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
 
     # 自定义源示例
     # - id: "custom-feed"
