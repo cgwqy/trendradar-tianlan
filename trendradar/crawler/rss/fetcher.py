@@ -100,6 +100,11 @@ class RSSFetcher:
 
             parsed_items = self.parser.parse(response.text, feed.url)
 
+            # [调试] 打印前3条标题（临时）
+            import logging
+            for _i, _it in enumerate(parsed_items[:3]):
+                print(f"[RSS调试] {feed.url[:60]} | 标题: {_it.title!r} | URL: {_it.url[:80]}")
+
             # 限制条目数量（0=不限制）
             if feed.max_items > 0:
                 parsed_items = parsed_items[:feed.max_items]
