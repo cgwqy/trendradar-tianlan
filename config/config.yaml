@@ -152,6 +152,16 @@ rss:
       name: "厄尔尼诺新闻(Google)"
       url: "https://news.google.com/rss/search?q=%E5%8E%84%E5%B0%94%E5%B0%BC%E8%AF%BA&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
 
+    - id: "em-report"
+      name: "造纸研报(东财)"
+      url: "eastmoney-report:造纸,纸业,木浆,纸浆,厄尔尼诺"
+      max_items: 30
+
+    - id: "em-news"
+      name: "造纸资讯(东财)"
+      url: "eastmoney-news:造纸,纸业,木浆,纸浆,浆,厄尔尼诺"
+      max_items: 30
+
     # 自定义源示例
     # - id: "custom-feed"
     #   name: "自定义源"
@@ -509,3 +519,4 @@ advanced:
     slack: 4000
   batch_send_interval: 3              # 批次发送间隔（秒）
   feishu_message_separator: "━━━━━━━━━━━━━━━━"
+
