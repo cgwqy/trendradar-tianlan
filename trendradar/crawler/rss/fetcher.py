@@ -100,22 +100,47 @@ class RSSFetcher:
 
             parsed_items = self.parser.parse(response.text, feed.url)
 
-            # DEBUG: 测试 RSSHub Google News 路由
+            # DEBUG: 测试多个新闻源方案
             if "news.google.com" in feed.url:
                 import requests as _req, re as _re
-                for _q in ["造纸", "木浆", "厄尔尼诺"]:
+                _ua = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36"}
+                # 1. Google URL 变体
+                _variants = [
+                    ("google-atom", "https://news.google.com/rss/search?q=%E9%80%A0%E7%BA%B8&output=atom"),
+                    ("google-glUS", "https://news.google.com/rss/search?q=%E9%80%A0%E7%BA%B8&hl=zh-CN&gl=US&ceid=US:zh-Hans"),
+                    ("google-noparam", "https://news.google.com/rss/search?q=%E9%80%A0%E7%BA%B8"),
+                ]
+                for _name, _u in _variants:
                     try:
-                        _r = _req.get("https://rsshub.app/google/news/" + _q, timeout=25, headers={"User-Agent": "Mozilla/5.0"})
-                        print(f"[DEBUG] RSSHub {_q}: HTTP {_r.status_code}, 长度={len(_r.text)}")
-                        if _r.status_code == 200:
-                            _links = _re.findall(r"<link>(https?://[^<]+)</link>", _r.text)[:5]
-                            for _l in _links:
-                                print(f"[DEBUG]   {_l[:100]}")
-                            _desc = _re.findall(r"<description><![CDATA\[.{0,200}", _r.text)
-                            if _desc:
-                                print(f"[DEBUG]   desc: {_desc[0][:150]}")
+                        _r = _req.get(_u, timeout=20, headers=_ua)
+                        _links = _re.findall(r"<link>([^<]+)</link>", _r.text)[:3]
+                        print(f"[DEBUG] {_name}: HTTP {_r.status_code} 链接: {[l[:60] for l in _links]}")
                     except Exception as _e:
-                        print(f"[DEBUG] RSSHub {_q}: 错误 {_e}")
+                        print(f"[DEBUG] {_name}: 错误 {_e}")
+                # 2. jina.ai 代理
+                try:
+                    _r = _req.get("https://r.jina.ai/https://news.google.com/rss/search?q=%E9%80%A0%E7%BA%B8", timeout=30, headers=_ua)
+                    print(f"[DEBUG] jina: HTTP {_r.status_code} 前200字: {_r.text[:200]!r}")
+                except Exception as _e:
+                    print(f"[DEBUG] jina: 错误 {_e}")
+                # 3. 百度资讯搜索
+                try:
+                    _r = _req.get("https://www.baidu.com/s?tn=news&word=%E9%80%A0%E7%BA%B8", timeout=20, headers=_ua)
+                    _m = _re.findall(r'<a[^>]+href="(http://www\.baidu\.com/link\?url=[^"]+)"[^>]*>(.*?)</a>', _r.text)[:3]
+                    print(f"[DEBUG] 百度资讯: HTTP {_r.status_code} 链接数={len(_re.findall(r'baidu\.com/link', _r.text))}")
+                    for _h, _t in _m:
+                        print(f"[DEBUG]   标题:{_t[:30]!r} 链接:{_h[:80]}")
+                except Exception as _e:
+                    print(f"[DEBUG] 百度资讯: 错误 {_e}")
+                # 4. 中国纸网
+                try:
+                    _r = _req.get("http://www.chinapaper.net/news/", timeout=20, headers=_ua)
+                    print(f"[DEBUG] 中国纸网: HTTP {_r.status_code} 长度={len(_r.text)}")
+                    _m = _re.findall(r'<a[^>]+href="([^"]*\.html[^"]*)"[^>]*>([^<]{8,40})</a>', _r.text)[:5]
+                    for _h, _t in _m:
+                        print(f"[DEBUG]   标题:{_t[:30]!r} 链接:{_h[:70]}")
+                except Exception as _e:
+                    print(f"[DEBUG] 中国纸网: 错误 {_e}")
 
             # 限制条目数量（0=不限制）
             if feed.max_items > 0:
