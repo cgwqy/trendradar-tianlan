@@ -8,7 +8,7 @@ HTML 报告渲染模块
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Callable
 
-from trendradar.report.helpers import html_escape, calculate_rank_trend
+from trendradar.report.helpers import html_escape, calculate_rank_trend, convert_google_news_url
 from trendradar.utils.time import convert_time_for_display
 from trendradar.ai.formatter import render_ai_analysis_html_rich
 
@@ -1689,6 +1689,7 @@ def render_html_content(
                 # 处理标题和链接
                 escaped_title = html_escape(title_data["title"])
                 link_url = title_data.get("mobile_url") or title_data.get("url", "")
+                link_url = convert_google_news_url(link_url, title_data.get("title", ""))
 
                 if link_url:
                     escaped_url = html_escape(link_url)
@@ -1756,6 +1757,7 @@ def render_html_content(
                 # 处理新增新闻的链接
                 escaped_title = html_escape(title_data["title"])
                 link_url = title_data.get("mobile_url") or title_data.get("url", "")
+                link_url = convert_google_news_url(link_url, title_data.get("title", ""))
 
                 if link_url:
                     escaped_url = html_escape(link_url)
@@ -1836,6 +1838,7 @@ def render_html_content(
             for title_data in titles:
                 item_title = title_data.get("title", "")
                 url = title_data.get("url", "")
+                url = convert_google_news_url(url, item_title)
                 time_display = title_data.get("time_display", "")
                 source_name = title_data.get("source_name", "")
                 is_new = title_data.get("is_new", False)
@@ -1988,6 +1991,7 @@ def render_html_content(
             for j, item in enumerate(items, 1):
                 title = item.get("title", "")
                 url = item.get("url", "") or item.get("mobileUrl", "")
+                url = convert_google_news_url(url, title)
                 rank = item.get("rank", 0)
                 ranks = item.get("ranks", [])
                 first_time = item.get("first_time", "")
@@ -2079,6 +2083,7 @@ def render_html_content(
             for j, item in enumerate(items, 1):
                 title = item.get("title", "")
                 url = item.get("url", "")
+                url = convert_google_news_url(url, title)
                 published_at = item.get("published_at", "")
                 author = item.get("author", "")
 
