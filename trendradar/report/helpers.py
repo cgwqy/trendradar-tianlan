@@ -165,3 +165,10 @@ def format_rank_display(
     trend_arrow = {"up": "📈", "down": "📉"}.get(trend, "")
 
     return f"{rank_str} {trend_arrow}" if trend_arrow else rank_str
+
+def convert_google_news_url(url, title=None):
+    """Google News 加密链接国内网络无法访问，转换为百度搜索链接"""
+    import urllib.parse
+    if url and "news.google.com" in url and title:
+        return "https://www.baidu.com/s?wd=" + urllib.parse.quote(title)
+    return url
