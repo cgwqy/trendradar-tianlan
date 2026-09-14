@@ -84,6 +84,121 @@ class RSSFetcher:
 
         return session
 
+    def _make_item(self, feed, title, url, guid, published_at, summary="", author=""):
+        """构造 RSSItem"""
+        now = get_configured_time(self.timezone)
+        crawl_time = now.strftime("%H:%M")
+        return RSSItem(
+            title=title,
+            feed_id=feed.id,
+            feed_name=feed.name,
+            url=url,
+            guid=guid or "",
+            published_at=published_at or "",
+            summary=summary or "",
+            author=author or "",
+            crawl_time=crawl_time,
+            first_time=crawl_time,
+            last_time=crawl_time,
+            count=1,
+        )
+
+    def _fetch_eastmoney_report(self, feed: RSSFeedConfig, keywords: str) -> Tuple[List[RSSItem], Optional[str]]:
+        """
+        抓取东方财富研报中心（近7天研报，按关键词过滤）
+
+        URL 格式: eastmoney-report:造纸,纸业,木浆
+        研报详情页链接: https://data.eastmoney.com/report/info/{infoCode}.html（国内可访问）
+        """
+        try:
+            import datetime as _dt
+            end = _dt.date.today()
+            begin = end - _dt.timedelta(days=7)
+            url = (f"https://reportapi.eastmoney.com/report/list?industryCode=*&pageSize=100"
+                   f"&industry=*&rating=&ratingChange=&beginTime={begin}&endTime={end}"
+                   f"&pageNo=1&fields=&qType=0&orgCode=&code=*&rcode=")
+            resp = self.session.get(url, timeout=self.timeout,
+                                    headers={"Referer": "https://data.eastmoney.com/report/"})
+            resp.raise_for_status()
+            data = resp.json().get("data") or []
+            kws = [k.strip() for k in keywords.split(",") if k.strip()]
+            items = []
+            for x in data:
+                title = x.get("title") or ""
+                if not any(k in title for k in kws):
+                    continue
+                org = x.get("orgSName") or ""
+                researcher = x.get("researcher") or ""
+                info_code = x.get("infoCode") or ""
+                pub = x.get("publishDate") or ""
+                items.append(self._make_item(
+                    feed,
+                    title=f"[{org}] {title}" if org else title,
+                    url=f"https://data.eastmoney.com/report/info/{info_code}.html",
+                    guid=info_code or url,
+                    published_at=pub[:16] if pub else "",
+                    summary=title,
+                    author=researcher,
+                ))
+            print(f"[RSS] {feed.name}: 获取 {len(items)} 条")
+            return items, None
+        except requests.RequestException as e:
+            error = f"东财研报请求失败: {e}"
+            print(f"[RSS] {feed.name}: {error}")
+            return [], error
+        except Exception as e:
+            error = f"东财研报解析失败: {e}"
+            print(f"[RSS] {feed.name}: {error}")
+            return [], error
+
+    def _fetch_eastmoney_news(self, feed: RSSFeedConfig, keywords: str) -> Tuple[List[RSSItem], Optional[str]]:
+        """
+        抓取东方财富资讯（宏观/产业/财经/公司栏目，按关键词过滤）
+
+        URL 格式: eastmoney-news:造纸,木浆,厄尔尼诺
+        原文链接: finance.eastmoney.com/a/{code}.html（国内可访问）
+        """
+        try:
+            kws = [k.strip() for k in keywords.split(",") if k.strip()]
+            items = []
+            for col in ["350", "353", "351", "354"]:
+                url = (f"https://np-listapi.eastmoney.com/comm/web/getNewsByColumns?"
+                       f"client=web&biz=web_news_col&column={col}&order=1&needInteractData=0"
+                       f"&page_index=1&page_size=100&req_trace=1")
+                resp = self.session.get(url, timeout=self.timeout,
+                                        headers={"Referer": "https://finance.eastmoney.com/"})
+                resp.raise_for_status()
+                lst = (resp.json().get("data") or {}).get("list") or []
+                for x in lst:
+                    summary = x.get("summary") or ""
+                    if not any(k in summary for k in kws):
+                        continue
+                    unique_url = x.get("uniqueUrl") or ""
+                    code = x.get("code") or ""
+                    # 标题取【】内部分，无则截断
+                    if "】" in summary:
+                        title = summary.split("】")[0].lstrip("【").strip()[:80]
+                    else:
+                        title = summary[:80]
+                    items.append(self._make_item(
+                        feed,
+                        title=title,
+                        url=unique_url,
+                        guid=code or unique_url,
+                        published_at=(x.get("showTime") or "")[:16],
+                        summary=summary,
+                    ))
+            print(f"[RSS] {feed.name}: 获取 {len(items)} 条")
+            return items, None
+        except requests.RequestException as e:
+            error = f"东财资讯请求失败: {e}"
+            print(f"[RSS] {feed.name}: {error}")
+            return [], error
+        except Exception as e:
+            error = f"东财资讯解析失败: {e}"
+            print(f"[RSS] {feed.name}: {error}")
+            return [], error
+
     def fetch_feed(self, feed: RSSFeedConfig) -> Tuple[List[RSSItem], Optional[str]]:
         """
         抓取单个 RSS 源
@@ -94,38 +209,19 @@ class RSSFetcher:
         Returns:
             (条目列表, 错误信息) 元组
         """
+        # 东财研报源（eastmoney-report:关键词）
+        if feed.url.startswith("eastmoney-report:"):
+            return self._fetch_eastmoney_report(feed, feed.url.split(":", 1)[1])
+
+        # 东财资讯源（eastmoney-news:关键词）
+        if feed.url.startswith("eastmoney-news:"):
+            return self._fetch_eastmoney_news(feed, feed.url.split(":", 1)[1])
+
         try:
             response = self.session.get(feed.url, timeout=self.timeout)
             response.raise_for_status()
 
             parsed_items = self.parser.parse(response.text, feed.url)
-
-            # DEBUG: 东财研报API测试
-            if "news.google.com" in feed.url:
-                import requests as _req
-                _ua = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36",
-                       "Referer": "https://data.eastmoney.com/report/"}
-                # 1. 研报列表API（industry=造纸）
-                try:
-                    _u = "https://reportapi.eastmoney.com/report/list?industryCode=*&pageSize=20&industry=%E9%80%A0%E7%BA%B8&rating=&ratingChange=&beginTime=2026-09-01&endTime=2026-09-16&pageNo=1&fields=&qType=0&orgCode=&code=*&rcode="
-                    _r = _req.get(_u, timeout=20, headers=_ua)
-                    print(f"[DEBUG] 研报[industry=造纸]: HTTP {_r.status_code}")
-                    _d = _r.json()
-                    _list = _d.get("data") or []
-                    print(f"[DEBUG]   条数={len(_list)} 总数={_d.get('hitCount') or '?'}")
-                    for _x in _list[:5]:
-                        print(f"[DEBUG]   {(_x.get('title') or '')[:34]!r}")
-                        print(f"[DEBUG]     机构:{(_x.get('orgSName') or '')[:12]} 作者:{(_x.get('researcher') or '')[:14]} 日期:{(_x.get('publishDate') or '')[:10]} 评级:{(_x.get('emRatingName') or _x.get('sRatingName') or '')[:8]}")
-                        print(f"[DEBUG]     infoUrl:{(_x.get('infoCode') or '')[:40]}")
-                except Exception as _e:
-                    print(f"[DEBUG] 研报[industry=造纸]: 错误 {str(_e)[:80]}")
-                # 2. 研报全量列表（最近研报，看字段）
-                try:
-                    _u2 = "https://reportapi.eastmoney.com/report/list?industryCode=*&pageSize=10&industry=*&rating=&ratingChange=&beginTime=2026-09-14&endTime=2026-09-16&pageNo=1&fields=&qType=0&orgCode=&code=*&rcode="
-                    _r2 = _req.get(_u2, timeout=20, headers=_ua)
-                    print(f"[DEBUG] 研报[全量]: HTTP {_r2.status_code} 前300: {_r2.text[:300]!r}")
-                except Exception as _e:
-                    print(f"[DEBUG] 研报[全量]: 错误 {str(_e)[:80]}")
 
             # 限制条目数量（0=不限制）
             if feed.max_items > 0:
