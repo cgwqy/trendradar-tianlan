@@ -103,9 +103,17 @@ class RSSFetcher:
             count=1,
         )
 
+    # 造纸行业 A 股上市公司代码（用于精准查询其研报）
+    _PAPER_STOCKS = [
+        "002078", "000488", "600966", "600567", "600963", "603733", "600308",
+        "605007", "603165", "002067", "600356", "600235", "002012", "600433",
+        "603863", "605500", "600103", "600793", "300883", "000815", "605377",
+        "603687", "002521",
+    ]
+
     def _fetch_eastmoney_report(self, feed: RSSFeedConfig, keywords: str) -> Tuple[List[RSSItem], Optional[str]]:
         """
-        抓取东方财富研报中心（近7天研报，按关键词过滤）
+        抓取东方财富研报中心：按造纸上市公司代码逐个查询研报 + 全量按关键词过滤
 
         URL 格式: eastmoney-report:造纸,纸业,木浆
         研报详情页链接: https://data.eastmoney.com/report/info/{infoCode}.html（国内可访问）
@@ -113,33 +121,55 @@ class RSSFetcher:
         try:
             import datetime as _dt
             end = _dt.date.today()
-            begin = end - _dt.timedelta(days=7)
-            url = (f"https://reportapi.eastmoney.com/report/list?industryCode=*&pageSize=100"
-                   f"&industry=*&rating=&ratingChange=&beginTime={begin}&endTime={end}"
-                   f"&pageNo=1&fields=&qType=0&orgCode=&code=*&rcode=")
-            resp = self.session.get(url, timeout=self.timeout,
-                                    headers={"Referer": "https://data.eastmoney.com/report/"})
-            resp.raise_for_status()
-            data = resp.json().get("data") or []
+            begin = end - _dt.timedelta(days=30)
             kws = [k.strip() for k in keywords.split(",") if k.strip()]
             items = []
-            for x in data:
-                title = x.get("title") or ""
-                if not any(k in title for k in kws):
-                    continue
-                org = x.get("orgSName") or ""
-                researcher = x.get("researcher") or ""
-                info_code = x.get("infoCode") or ""
-                pub = x.get("publishDate") or ""
-                items.append(self._make_item(
-                    feed,
-                    title=f"[{org}] {title}" if org else title,
-                    url=f"https://data.eastmoney.com/report/info/{info_code}.html",
-                    guid=info_code or url,
-                    published_at=pub[:16] if pub else "",
-                    summary=title,
-                    author=researcher,
-                ))
+            seen = set()
+
+            def _collect(code: str, need_kw_filter: bool):
+                url = (f"https://reportapi.eastmoney.com/report/list?industryCode=*&pageSize=20"
+                       f"&industry=*&rating=&ratingChange=&beginTime={begin}&endTime={end}"
+                       f"&pageNo=1&fields=&qType=0&orgCode=&code={code}&rcode=")
+                resp = self.session.get(url, timeout=self.timeout,
+                                        headers={"Referer": "https://data.eastmoney.com/report/"})
+                resp.raise_for_status()
+                data = resp.json().get("data") or []
+                for x in data:
+                    title = x.get("title") or ""
+                    info_code = x.get("infoCode") or ""
+                    if not info_code or info_code in seen:
+                        continue
+                    if need_kw_filter and not any(k in title for k in kws):
+                        continue
+                    seen.add(info_code)
+                    org = x.get("orgSName") or ""
+                    researcher = x.get("researcher") or ""
+                    pub = x.get("publishDate") or ""
+                    items.append(self._make_item(
+                        feed,
+                        title=f"[{org}] {title}" if org else title,
+                        url=f"https://data.eastmoney.com/report/info/{info_code}.html",
+                        guid=info_code,
+                        published_at=pub[:16] if pub else "",
+                        summary=title,
+                        author=researcher,
+                    ))
+
+            # 1) 造纸上市公司逐个查询（研报必然相关，不过滤标题）
+            for code in self._PAPER_STOCKS:
+                try:
+                    _collect(code, need_kw_filter=False)
+                except Exception:
+                    pass
+                time.sleep(0.3)
+            # 2) 全量最近研报，按关键词兜底过滤
+            try:
+                _collect("*", need_kw_filter=True)
+            except Exception:
+                pass
+
+            # 按发布时间倒序
+            items.sort(key=lambda it: it.published_at, reverse=True)
             print(f"[RSS] {feed.name}: 获取 {len(items)} 条")
             return items, None
         except requests.RequestException as e:
