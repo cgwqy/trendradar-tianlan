@@ -100,32 +100,32 @@ class RSSFetcher:
 
             parsed_items = self.parser.parse(response.text, feed.url)
 
-            # DEBUG: 东财列表栏目测试+关键词过滤
+            # DEBUG: 东财研报API测试
             if "news.google.com" in feed.url:
-                import requests as _req, json as _json
+                import requests as _req
                 _ua = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36",
-                       "Referer": "https://finance.eastmoney.com/"}
-                _kws = ["纸", "木浆", "厄尔尼诺", "浆"]
-                for _col, _name in [(350, "宏观"), (353, "产业"), (351, "财经"), (354, "公司")]:
-                    try:
-                        _u = f"https://np-listapi.eastmoney.com/comm/web/getNewsByColumns?client=web&biz=web_news_col&column={_col}&order=1&needInteractData=0&page_index=1&page_size=30&req_trace=1"
-                        _r = _req.get(_u, timeout=20, headers=_ua)
-                        _d = _r.json()
-                        _list = (_d.get("data") or {}).get("list") or []
-                        _hit = [x for x in _list if any(k in (x.get("summary") or "") for k in _kws)]
-                        print(f"[DEBUG] 东财[{_name}/col={_col}]: 共{len(_list)}条 命中关键词={len(_hit)}")
-                        for _x in _hit[:5]:
-                            print(f"[DEBUG]   {(_x.get('summary') or '')[:38]!r}")
-                            print(f"[DEBUG]     -> {(_x.get('uniqueUrl') or '')[:75]}  {(_x.get('showTime') or '')[:16]}")
-                    except Exception as _e:
-                        print(f"[DEBUG] 东财[{_name}/col={_col}]: 错误 {str(_e)[:60]}")
-                # 对照组：Google 列表当前是否正常
+                       "Referer": "https://data.eastmoney.com/report/"}
+                # 1. 研报列表API（industry=造纸）
                 try:
-                    _u = "https://news.google.com/rss/search?q=%E9%80%A0%E7%BA%B8"
-                    _r = _req.get(_u, timeout=15, headers=_ua)
-                    print(f"[DEBUG] Google对照: HTTP {_r.status_code} 长度={len(_r.text)}")
+                    _u = "https://reportapi.eastmoney.com/report/list?industryCode=*&pageSize=20&industry=%E9%80%A0%E7%BA%B8&rating=&ratingChange=&beginTime=2026-09-01&endTime=2026-09-16&pageNo=1&fields=&qType=0&orgCode=&code=*&rcode="
+                    _r = _req.get(_u, timeout=20, headers=_ua)
+                    print(f"[DEBUG] 研报[industry=造纸]: HTTP {_r.status_code}")
+                    _d = _r.json()
+                    _list = _d.get("data") or []
+                    print(f"[DEBUG]   条数={len(_list)} 总数={_d.get('hitCount') or '?'}")
+                    for _x in _list[:5]:
+                        print(f"[DEBUG]   {(_x.get('title') or '')[:34]!r}")
+                        print(f"[DEBUG]     机构:{(_x.get('orgSName') or '')[:12]} 作者:{(_x.get('researcher') or '')[:14]} 日期:{(_x.get('publishDate') or '')[:10]} 评级:{(_x.get('emRatingName') or _x.get('sRatingName') or '')[:8]}")
+                        print(f"[DEBUG]     infoUrl:{(_x.get('infoCode') or '')[:40]}")
                 except Exception as _e:
-                    print(f"[DEBUG] Google对照: 错误 {str(_e)[:60]}")
+                    print(f"[DEBUG] 研报[industry=造纸]: 错误 {str(_e)[:80]}")
+                # 2. 研报全量列表（最近研报，看字段）
+                try:
+                    _u2 = "https://reportapi.eastmoney.com/report/list?industryCode=*&pageSize=10&industry=*&rating=&ratingChange=&beginTime=2026-09-14&endTime=2026-09-16&pageNo=1&fields=&qType=0&orgCode=&code=*&rcode="
+                    _r2 = _req.get(_u2, timeout=20, headers=_ua)
+                    print(f"[DEBUG] 研报[全量]: HTTP {_r2.status_code} 前300: {_r2.text[:300]!r}")
+                except Exception as _e:
+                    print(f"[DEBUG] 研报[全量]: 错误 {str(_e)[:80]}")
 
             # 限制条目数量（0=不限制）
             if feed.max_items > 0:
