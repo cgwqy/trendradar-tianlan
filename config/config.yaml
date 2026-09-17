@@ -52,13 +52,13 @@ platforms:
     expected_domain: jin10.com
   - id: fastbull
     name: 法布财经
-    expected_domain: fastbull.cn
+    expected_domain: fastbull.com
   - id: hupu
     name: 虎扑
     expected_domain: hupu.com
   - id: zaobao
     name: 联合早报
-    expected_domain: zaobao.com
+    expected_domain: zaochenbao.com
   - id: 36kr-renqi
     name: 36氪人气榜
     expected_domain: 36kr.com
