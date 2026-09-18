@@ -96,11 +96,11 @@ rss:
     max_items: 30
   - id: oilchem-pulp
     name: 隆众纸浆(RSSHub)
-    url: https://rsshub.app/oilchem/paper/paper/pulp
+    url: https://rsshub.ktachibana.party/oilchem/paper/paper/pulp
     enabled: true
   - id: oilchem-paper
     name: 隆众造纸(RSSHub)
-    url: https://rsshub.app/oilchem/paper
+    url: https://rsshub.ktachibana.party/oilchem/paper
     enabled: true
 report:
   mode: current
