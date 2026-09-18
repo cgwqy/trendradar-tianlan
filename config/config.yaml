@@ -94,14 +94,6 @@ rss:
     name: 造纸资讯(东财)
     url: eastmoney-news:造纸,纸业,木浆,纸浆,浆,厄尔尼诺
     max_items: 30
-  - id: oilchem-pulp
-    name: 隆众纸浆(RSSHub)
-    url: https://rsshub.ktachibana.party/oilchem/paper/paper/pulp
-    enabled: true
-  - id: oilchem-paper
-    name: 隆众造纸(RSSHub)
-    url: https://rsshub.ktachibana.party/oilchem/paper
-    enabled: true
 report:
   mode: current
   display_mode: keyword
